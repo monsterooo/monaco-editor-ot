@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>monaco-editor & ot.js</title>
+</head>
+<body>
+  <h2>Monaco Editor OT</h2>
+  <div id="container" style="width:400px;height:300px;border:1px solid grey"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.5/require.min.js" integrity="sha256-0SGl1PJNDyJwcV5T+weg2zpEMrh7xvlwO4oXgvZCeZk=" crossorigin="anonymous"></script>
+  <script>
+    window.resolve = null;
+    window.reject = null;
+    window.loaded = new Promise(function(resolve, reject){
+      window.resolve = resolve;
+      window.reject = reject;
+    });
+    require.config({ paths: { 'vs': 'https://cdn.staticfile.org/monaco-editor/0.20.0/min/vs' }});
+
+    require(['vs/editor/editor.main'], function() {
+      window.resolve();
+    });
+  </script>
+</body>
+</html>
