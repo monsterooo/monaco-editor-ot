@@ -14,9 +14,9 @@ function rangeFromIndex(monacoIns, index) {
       countSize += size;
       continue;
     } else if (index === (countSize + size)) {
-      return { col: (countSize + size), line: i };
+      return { col: (countSize + size), line: i+ 1 };
     } else if (index < (countSize + size)) {
-      return { col: (countSize + size) - index, line: i };
+      return { col: (countSize + size) - index, line: i + 1 };
     }
   }
 }

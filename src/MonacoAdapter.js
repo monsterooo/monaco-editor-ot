@@ -73,7 +73,6 @@ class MonacoAdapter {
     this.applyOperationToMonaco(operation);
   }
   applyOperationToMonaco(operation) {
-    debugger;
     const { ops } = operation;
     const model = this.monacoIns.getModel();
     let index = 0;
@@ -84,21 +83,37 @@ class MonacoAdapter {
         index += op;
       } else if (TextOperation.isInsert(op)) {
         // 某个操作是插入我们替换编辑器的内容
+        const inser = model.getPositionAt(index);
+        this.monacoIns.executeEdits(
+          this.monacoIns.getModel().getValue(),
+          [{
+            forceMoveMarkers: true,
+            range: new monaco.Range(
+              inser.lineNumber,
+              inser.column,
+              inser.lineNumber,
+              inser.column
+            ),
+            text: op,
+          }]
+        );
         index += op.length; // 据需跟进我们的索引
       } else if (TextOperation.isDelete(op)) {
-        const from = rangeFromIndex(this.monacoIns, index);
-        const to = rangeFromIndex(this.monacoIns, index - op);
-        model.applyEdits({
-          forceMoveMarkers: false,
-          // TODO 同步服务器删除不工作
-          range: new monaco.Range(
-            from.line,
-            from.col,
-            to.line,
-            to.col
-          ),
-          text: null,
-        });        
+        const start = model.getPositionAt(index);
+        const end = model.getPositionAt(index - op)
+        this.monacoIns.executeEdits(
+          this.monacoIns.getModel().getValue(),
+          [{
+            forceMoveMarkers: false,
+            range: new monaco.Range(
+              start.lineNumber,
+              start.column,
+              end.lineNumber,
+              end.column
+            ),
+            text: null,
+          }]
+        );        
       }
     }
   }

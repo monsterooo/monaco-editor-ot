@@ -23,7 +23,6 @@ class EditorClient extends Client {
     });
     this.serverAdapter.registerCallbacks({
       operation: operation => {
-        debugger;
         this.applyServer(TextOperation.fromJSON(operation));
       }
     })
