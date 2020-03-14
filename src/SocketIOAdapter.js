@@ -1,13 +1,14 @@
-
 class SocketIOAdapter {
   constructor(socket) {
     this.socket = socket;
     // client与socket事件交互适配类
     socket
-      .on('ack', () => this.trigger('ack'))
+      .on('ack', () => {
+        this.trigger('ack')
+      })
       .on('operation', (clientId, operation, selection) => {
         this.trigger('operation', operation);
-        this.trigger('selection', clientId, selection);
+        // this.trigger('selection', clientId, selection);
       })
       .on('selection', (clientId, selection) => {
         this.trigger('selection', clientId, selection);
@@ -40,6 +41,10 @@ class SocketIOAdapter {
    */
   registerCallbacks(cb) {
     this.callbacks = cb;
+  }
+  sendSelection(selectionData) {
+    console.log('客户端发送selection', selectionData)
+    this.socket.emit('selection', selectionData);
   }
 }
 

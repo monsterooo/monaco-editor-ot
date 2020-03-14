@@ -8,13 +8,17 @@ const synchronized_ = new Synchronized();
 class Client {
   constructor(revision) {
     this.revision = revision;
-    this.state = synchronized_;
+    this.state = synchronized_; // 默认状态为本地同步状态
   }
   setState(state) {
     this.state = state;
   }
   // 当用户更改编辑器时调用此方法更改状态
   applyClient(operation) {
+    /*
+      情况1：
+      Synchronized => sendOperation => AwaitingConfirm => ack => synchronized_
+    */
     this.setState(this.state.applyClient(this, operation));
   }
   // 来自服务器的新操作调用此方法
@@ -22,6 +26,7 @@ class Client {
     this.revision++;
     this.setState(this.state.applyServer(this, operation));
   }
+  // 一旦收到服务器确认，必须切换本地的对应状态
   serverAck() {
     this.revision++;
     this.setState(this.state.serverAck(this));
@@ -44,3 +49,6 @@ Client.AwaitingConfirm = AwaitingConfirm;
 Client.AwaitingWithBuffer = AwaitingWithBuffer;
 
 export default Client;
+export {
+  synchronized_
+};

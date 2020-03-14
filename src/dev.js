@@ -5,11 +5,15 @@ import SocketIOAdapter from './SocketIOAdapter';
 
 window.loaded.then(() => {
   var monacoIns = monaco.editor.create(document.getElementById('container'), {
-    value: ['Monaco Editor Sample'].join('\n'),
+    value: [''].join('\n'),
     language: 'javascript'
   });
   window.monacoIns = monacoIns;
+
   const socket = io.connect('127.0.0.1:3000');
+
+  socket.emit('login', { name: 'tudousi' })
+
   socket.on('doc', obj => {
     const { str, revision, clients } = obj;
 
@@ -20,7 +24,5 @@ window.loaded.then(() => {
       new SocketIOAdapter(socket),
       new MonacoAdapter(monacoIns)
     );
-  })
-  
-  
+  });
 });

@@ -24,7 +24,7 @@ class Synchronized {
     return this;
   }
   serverAck(client) {
-    throw new Error('There is no pending operation.');
+    throw new Error('没有挂起的操作.');
   }
   // 不需要执行任何操作，因为最新的服务器状态和客户机状态是相同的
   transformSelection(x) {
