@@ -33,7 +33,11 @@ class MonacoAdapter {
       const model = monacoIns.getModel();
       const linesContent = model.getLinesContent() || [];
       const selectionData = getSelection(linesContent, selection);
+      
       this.trigger('selectionChange', selectionData);
+    });
+    monacoIns.onDidBlurEditorText(() => {
+      this.trigger('blur');
     })
   }
   /**

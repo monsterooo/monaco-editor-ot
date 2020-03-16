@@ -29,7 +29,7 @@ class OtherClient {
     this.hue = hue;
     this.color = hsl2hex(hue, 0.75, 0.5);
     this.lightColor = hsl2hex(hue, 0.5, 0.9);
-    // if (this.li) { this.li.style.color = this.color; }
+    this.selectionColor = hsl2hex(hue, 0.75, 0.3);
   }
   updateSelection(selection) {
     const userClassesGenerated = {};
@@ -39,6 +39,7 @@ class OtherClient {
     this.selection = selection;
     const prefix = this.id;
     const cursorClassName = prefix + '-cursor';
+    const selectionClassName = prefix + '-selection';
     const addCursor = (position, className) => {
       const cursorPos = indexToLineAndColumn(lines, position);
       decorations.push({
@@ -47,6 +48,22 @@ class OtherClient {
           cursorPos.column,
           cursorPos.lineNumber,
           cursorPos.column
+        ),
+        options: {
+          className: userClassesGenerated[className],
+        },
+      });
+    };
+    const addSelection = (start, end, className) => {
+      const from = indexToLineAndColumn(lines, start);
+      const to = indexToLineAndColumn(lines, end);
+
+      decorations.push({
+        range: new monaco.Range(
+          from.lineNumber,
+          from.column,
+          to.lineNumber,
+          to.column
         ),
         options: {
           className: userClassesGenerated[className],
@@ -69,31 +86,51 @@ class OtherClient {
       pointerEvents: 'none',
       width: 'max-content',
     };
-    userClassesGenerated[cursorClassName] = `${css({
-      backgroundColor: this.color,
-      width: '2px !important',
-      cursor: 'text',
-      ':before': {
-        animation: `${fadeOut} 0.3s`,
-        animationDelay: '1s',
-        animationFillMode: 'forwards',
-        opacity: 1,
-        ...nameStyles,
-      },
-      ':hover': {
+    if (!userClassesGenerated[cursorClassName]) {
+      userClassesGenerated[cursorClassName] = `${css({
+        backgroundColor: this.color,
+        width: '2px !important',
+        cursor: 'text',
         ':before': {
-          animation: `${fadeIn} 0.3s`,
+          animation: `${fadeOut} 0.3s`,
+          animationDelay: '1s',
           animationFillMode: 'forwards',
-          opacity: 0,
+          opacity: 1,
           ...nameStyles,
         },
-      },
-    })}`;
+        ':hover': {
+          ':before': {
+            animation: `${fadeIn} 0.3s`,
+            animationFillMode: 'forwards',
+            opacity: 0,
+            ...nameStyles,
+          },
+        },
+      })}`;
+      userClassesGenerated[selectionClassName] = `${css({
+        backgroundColor: this.selectionColor,
+        borderRadius: '3px',
+        minWidth: 7.6,
+      })}`;
+    }
     addCursor(selection.cursorPosition, cursorClassName);
-
+    if (selection.selection && selection.selection.length) {
+      addSelection(
+        selection.selection[0],
+        selection.selection[1],
+        selectionClassName
+      );
+    }
     this.decorationId = this.editorAdapter.monacoIns.deltaDecorations(
       this.decorationId || [],
       decorations
+    );
+  }
+  remove() {
+    if (!this.decorationId) return;
+    this.editorAdapter.monacoIns.deltaDecorations(
+      this.decorationId,
+      []
     );
   }
 }

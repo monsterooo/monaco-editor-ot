@@ -13,6 +13,9 @@ class SocketIOAdapter {
       .on('selection', (clientId, selection) => {
         this.trigger('selection', clientId, selection);
       })
+      .on('client_left', (clientId) => {
+        this.trigger('client_left', clientId)
+      })
       .on('reconnect', () => {
         console.log('receive reconnect event');
       });

@@ -23,6 +23,9 @@ class EditorClient extends Client {
       },
       selectionChange: (selectionData) => {
         this.onSelectionChange(selectionData);
+      },
+      blur: () => {
+        this.onBlur();
       }
     });
     this.serverAdapter.registerCallbacks({
@@ -34,10 +37,15 @@ class EditorClient extends Client {
           this.getClientObject(clientId).updateSelection(
             selection
           );
+        } else {
+          this.getClientObject(clientId).remove();
         }
       },
       ack: () => {
         this.serverAck();
+      },
+      client_left: (clientId) => {
+        this.onClientLeft(clientId);
       }
     })
   }
@@ -45,6 +53,9 @@ class EditorClient extends Client {
     const operation = new WrappedOperation(textOperation);
     // TODO 撤销
     this.applyClient(textOperation);
+  }
+  onBlur() {
+    this.sendSelection(null);
   }
   /**
    * 从Synchronized过来的发送操作，它又去调用服务器适配器发送操作
@@ -87,6 +98,12 @@ class EditorClient extends Client {
       clientId,
       this.editorAdapter,
     );
+  }
+  onClientLeft(clientId) {
+    const client = this.clients[clientId];
+    if (client) {
+      client.remove();
+    }
   }
 }
 
