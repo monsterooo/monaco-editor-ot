@@ -7,23 +7,20 @@ class MonacoAdapter {
     this.callbacks = null;
     this.monacoIns = monacoIns;
     this.ignoreNextChange = false;
-    this.previousValue = getValue(monacoIns);
+    this.previousValue = monaco.editor.createModel(getValue(monacoIns));
     
     monacoIns.onDidChangeModelContent(event => {
       if (!this.ignoreNextChange) {
-        let pair = null;
         try {
-          pair = this.operationFromMonacoChange(event, this.monacoIns);
+          const pair = this.operationFromMonacoChange(event, this.monacoIns);
+          this.trigger('change', pair);
         } catch (err) {
           console.log('出错数据')
           console.log(event, this.previousValue);
           throw err;
         }
-        this.previousValue = pair[1];
-        this.trigger('change', pair[0]);
       }
-      this.changeInProgress = false;
-      this.ignoreNextChange = false;
+      this.previousValue.setValue(getValue(monacoIns))
     });
     /**
      * https://microsoft.github.io/monaco-editor/api/enums/monaco.editor.cursorchangereason.html
@@ -34,10 +31,10 @@ class MonacoAdapter {
       const linesContent = model.getLinesContent() || [];
       const selectionData = getSelection(linesContent, selection);
       
-      this.trigger('selectionChange', selectionData);
+      // this.trigger('selectionChange', selectionData);
     });
     monacoIns.onDidBlurEditorText(() => {
-      this.trigger('blur');
+      // this.trigger('blur');
     })
   }
   /**
@@ -50,41 +47,33 @@ class MonacoAdapter {
    * @param {*} monacoIns 编辑器实例
    */
   operationFromMonacoChange(event, monacoIns) {
-    const monacoValue = this.previousValue;
-    let composeCode = monacoValue;
-    let operation = null;
+    const model = monacoIns.getModel();
+    let docEndLength = model.getValueLength();
+    let operation = new TextOperation().retain(docEndLength);
 
     for(let i = 0; i < event.changes.length; i++) {
-      const newOt = new TextOperation();
       const change = event.changes[i];
-      const cursorStartOffset = lineAndColumnToIndex(
-        monacoValue.split(/\n/),
-        change.range.startLineNumber,
-        change.range.startColumn
-      );
-      
-      const retain = cursorStartOffset - newOt.targetLength; // 当前保持位置长度
+      const {
+        rangeOffset, // 操作开始位置
+        rangeLength, // 删除或替换长度
+        text, // 增加文本
+      } = change;
+      const newOt = new TextOperation();
+      const restLength = docEndLength - rangeOffset - text.length;
 
-      // 下面将编辑器操作转换成operation
-      if (retain !== 0) {
-        newOt.retain(retain);
+      newOt.retain(rangeOffset);
+      if (rangeLength > 0) {
+        newOt.delete(rangeLength);
       }
-      if (change.rangeLength > 0) {
-        // 根据上面所说我们要删除输入被只能提示覆盖的字母
-        newOt.delete(change.rangeLength);
+      if (text) {
+        newOt.insert(text);
       }
-      if (change.text) {
-        newOt.insert(change.text);
-      }
-      // 当前编辑内容长度 - operation的
-      const remaining = composeCode.length - newOt.baseLength;
-      if (remaining > 0) {
-        newOt.retain(remaining);
-      }
-      operation = operation ? operation.compose(newOt) : newOt;
-      composeCode = operation.apply(monacoValue)
+      newOt.retain(restLength);
+      console.log('newOt', newOt)
+      operation = newOt.compose(operation);
+      docEndLength += rangeLength - text.length;
     }
-    return [operation, composeCode];
+    return operation;
   }
   /**
    * 触发当前对象注册的回调事件
@@ -107,11 +96,14 @@ class MonacoAdapter {
     // 所以这里我们要忽略下一次编辑器的修改
     this.ignoreNextChange = true;
     this.applyOperationToMonaco(operation);
+    this.ignoreNextChange = false;
   }
-  applyOperationToMonaco(operation) {
+  applyOperationToMonaco(operation, pushStack = false) {
     const { ops } = operation;
     const model = this.monacoIns.getModel();
     let index = 0;
+    const results = [];
+
     for(let i = 0; i < ops.length; i++) {
       const op = ops[i];
       // 如果某个操作是保留则我们的索引保持跟进
@@ -120,40 +112,37 @@ class MonacoAdapter {
       } else if (TextOperation.isInsert(op)) {
         // 某个操作是插入我们替换编辑器的内容
         const insert = model.getPositionAt(index);
-        model.pushEditOperations(
-          this.monacoIns.getSelections(),
-          [{
-            forceMoveMarkers: true,
-            range: new monaco.Range(
-              insert.lineNumber,
-              insert.column,
-              insert.lineNumber,
-              insert.column
-            ),
-            text: op,
-          }],
-          () => null
-        )
-        index += op.length; // 据需跟进我们的索引
+        results.push({
+          forceMoveMarkers: true,
+          range: new monaco.Range(
+            insert.lineNumber,
+            insert.column,
+            insert.lineNumber,
+            insert.column
+          ),
+          text: op,
+        });
       } else if (TextOperation.isDelete(op)) {
         const start = model.getPositionAt(index);
         const end = model.getPositionAt(index - op)
 
-        model.pushEditOperations(
-          this.monacoIns.getSelections(),
-          [{
-            forceMoveMarkers: false,
-            range: new monaco.Range(
-              start.lineNumber,
-              start.column,
-              end.lineNumber,
-              end.column
-            ),
-            text: null,
-          }],
-          () => null
-        );
+        results.push({
+          forceMoveMarkers: false,
+          range: new monaco.Range(
+            start.lineNumber,
+            start.column,
+            end.lineNumber,
+            end.column
+          ),
+          text: null,
+        });
+        index -= op;
       }
+    }
+    if (pushStack) {
+      model.pushEditOperations([], results);
+    } else {
+      model.applyEdits(results);
     }
   }
 }
