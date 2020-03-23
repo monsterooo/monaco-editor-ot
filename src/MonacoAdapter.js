@@ -7,7 +7,7 @@ class MonacoAdapter {
     this.callbacks = null;
     this.monacoIns = monacoIns;
     this.ignoreNextChange = false;
-    this.previousValue = monaco.editor.createModel(getValue(monacoIns));
+    this.liveOperationCode = getValue(monacoIns);
     
     monacoIns.onDidChangeModelContent(event => {
       if (!this.ignoreNextChange) {
@@ -15,12 +15,10 @@ class MonacoAdapter {
           const pair = this.operationFromMonacoChange(event, this.monacoIns);
           this.trigger('change', pair);
         } catch (err) {
-          console.log('出错数据')
-          console.log(event, this.previousValue);
+          console.log('错误信息', err);
           throw err;
         }
       }
-      this.previousValue.setValue(getValue(monacoIns))
     });
     /**
      * https://microsoft.github.io/monaco-editor/api/enums/monaco.editor.cursorchangereason.html
@@ -31,10 +29,10 @@ class MonacoAdapter {
       const linesContent = model.getLinesContent() || [];
       const selectionData = getSelection(linesContent, selection);
       
-      // this.trigger('selectionChange', selectionData);
+      this.trigger('selectionChange', selectionData);
     });
     monacoIns.onDidBlurEditorText(() => {
-      // this.trigger('blur');
+      this.trigger('blur');
     })
   }
   /**
@@ -46,33 +44,38 @@ class MonacoAdapter {
    * 然后event.change.text为回车的提示文本
    * @param {*} monacoIns 编辑器实例
    */
-  operationFromMonacoChange(event, monacoIns) {
-    const model = monacoIns.getModel();
-    let docEndLength = model.getValueLength();
-    let operation = new TextOperation().retain(docEndLength);
+  operationFromMonacoChange(event) {
+    let composedCode = this.liveOperationCode;
+    let operation;
 
     for(let i = 0; i < event.changes.length; i++) {
       const change = event.changes[i];
+      const cursorStartOffset = lineAndColumnToIndex(
+        composedCode.split(/\n/),
+        change.range.startLineNumber,
+        change.range.startColumn
+      );
       const {
-        rangeOffset, // 操作开始位置
         rangeLength, // 删除或替换长度
         text, // 增加文本
       } = change;
       const newOt = new TextOperation();
-      const restLength = docEndLength - rangeOffset - text.length;
 
-      newOt.retain(rangeOffset);
+      newOt.retain(cursorStartOffset);
       if (rangeLength > 0) {
         newOt.delete(rangeLength);
       }
       if (text) {
         newOt.insert(text);
       }
-      newOt.retain(restLength);
-      console.log('newOt', newOt)
-      operation = newOt.compose(operation);
-      docEndLength += rangeLength - text.length;
+      const remaining = composedCode.length - newOt.baseLength;
+      if (remaining > 0) {
+        newOt.retain(remaining);
+      }
+      operation = operation ? operation.compose(newOt) : newOt;
+      composedCode = operation.apply(this.liveOperationCode);
     }
+    this.liveOperationCode = composedCode;
     return operation;
   }
   /**
